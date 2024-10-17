@@ -1,12 +1,13 @@
 package preprocessing
 
 import (
+	"math"
+
 	"github.com/wieku/danser-go/app/beatmap/difficulty"
 	"github.com/wieku/danser-go/app/beatmap/objects"
 	"github.com/wieku/danser-go/framework/math/math32"
 	"github.com/wieku/danser-go/framework/math/mutils"
 	"github.com/wieku/danser-go/framework/math/vector"
-	"math"
 )
 
 const (
@@ -14,6 +15,14 @@ const (
 	CircleSizeBuffThreshold = 30.0
 	MinDeltaTime            = 25
 )
+
+type ReadingObject struct {
+}
+
+type OverlapObject struct {
+	Index       int32
+	Overlapness float64
+}
 
 type DifficultyObject struct {
 	// That's stupid but oh well
@@ -52,21 +61,39 @@ type DifficultyObject struct {
 	StrainTime float64
 
 	GreatWindow float64
+
+	ClockRate float64
+
+	Preempt float64
+
+	FollowLineTime float64
+
+	RhythmDifficulty float64
+
+	AnglePredictability float64
+
+	ReadingObjects []ReadingObject
+
+	OverlapObjects []OverlapObject
 }
 
 func NewDifficultyObject(hitObject, lastLastObject, lastObject objects.IHitObject, d *difficulty.Difficulty, listOfDiffs *[]*DifficultyObject, index int) *DifficultyObject {
 	obj := &DifficultyObject{
-		listOfDiffs:    listOfDiffs,
-		Index:          index,
-		Diff:           d,
-		BaseObject:     hitObject,
-		lastObject:     lastObject,
-		lastLastObject: lastLastObject,
-		DeltaTime:      (hitObject.GetStartTime() - lastObject.GetStartTime()) / d.Speed,
-		StartTime:      hitObject.GetStartTime() / d.Speed,
-		EndTime:        hitObject.GetEndTime() / d.Speed,
-		Angle:          math.NaN(),
-		GreatWindow:    2 * d.Hit300U / d.Speed,
+		listOfDiffs:      listOfDiffs,
+		Index:            index,
+		Diff:             d,
+		BaseObject:       hitObject,
+		lastObject:       lastObject,
+		lastLastObject:   lastLastObject,
+		DeltaTime:        (hitObject.GetStartTime() - lastObject.GetStartTime()) / d.Speed,
+		StartTime:        hitObject.GetStartTime() / d.Speed,
+		EndTime:          hitObject.GetEndTime() / d.Speed,
+		Angle:            math.NaN(),
+		GreatWindow:      2 * d.Hit300U / d.Speed,
+		ClockRate:        d.Speed,
+		Preempt:          d.PreemptU / d.Speed,
+		FollowLineTime:   0,
+		RhythmDifficulty: math.NaN(),
 	}
 
 	if _, ok := hitObject.(*objects.Spinner); ok {
@@ -80,6 +107,13 @@ func NewDifficultyObject(hitObject, lastLastObject, lastObject objects.IHitObjec
 	obj.StrainTime = max(obj.DeltaTime, MinDeltaTime)
 
 	obj.setDistances()
+
+	if !hitObject.IsNewCombo() {
+		obj.FollowLineTime = 800.0 / d.Speed
+	}
+
+	obj.AnglePredictability = obj.getAnglePredictability()
+	obj.ReadingObjects = obj.getReadingObjects()
 
 	return obj
 }
@@ -217,5 +251,15 @@ func getEndCursorPosition(obj objects.IHitObject, d *difficulty.Difficulty) (pos
 		pos = s.LazyEndPosition
 	}
 
+	return
+}
+
+func (o *DifficultyObject) getAnglePredictability() (anglePredictability float64) {
+	anglePredictability = 0
+	return
+}
+
+func (o *DifficultyObject) getReadingObjects() (readingObjects []ReadingObject) {
+	readingObjects = make([]ReadingObject, 0)
 	return
 }
