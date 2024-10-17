@@ -2,7 +2,7 @@ package skills
 
 import (
 	"github.com/wieku/danser-go/app/beatmap/difficulty"
-	"github.com/wieku/danser-go/app/rulesets/osu/performance/pp241007/preprocessing"
+	"github.com/wieku/danser-go/app/rulesets/osu/performance/reading/preprocessing"
 	"github.com/wieku/danser-go/framework/collections"
 	"github.com/wieku/danser-go/framework/math/mutils"
 	"math"

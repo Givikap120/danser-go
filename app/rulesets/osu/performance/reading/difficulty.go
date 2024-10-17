@@ -1,14 +1,15 @@
-package pp241007
+package reading
 
 import (
-	"github.com/wieku/danser-go/app/beatmap/difficulty"
-	"github.com/wieku/danser-go/app/beatmap/objects"
-	"github.com/wieku/danser-go/app/rulesets/osu/performance/api"
-	"github.com/wieku/danser-go/app/rulesets/osu/performance/pp241007/preprocessing"
-	"github.com/wieku/danser-go/app/rulesets/osu/performance/pp241007/skills"
 	"log"
 	"math"
 	"time"
+
+	"github.com/wieku/danser-go/app/beatmap/difficulty"
+	"github.com/wieku/danser-go/app/beatmap/objects"
+	"github.com/wieku/danser-go/app/rulesets/osu/performance/api"
+	"github.com/wieku/danser-go/app/rulesets/osu/performance/reading/preprocessing"
+	"github.com/wieku/danser-go/app/rulesets/osu/performance/reading/skills"
 )
 
 const (
