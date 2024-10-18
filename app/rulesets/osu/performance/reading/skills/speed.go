@@ -16,8 +16,8 @@ const (
 type SpeedSkill struct {
 	*Skill
 
-	currentStrain float64
-	currentRhythm float64
+	CurrentStrain float64
+	CurrentRhythm float64
 	maxStrain     float64
 
 	relevantNoteCountV float64
@@ -40,16 +40,19 @@ func (s *SpeedSkill) strainDecay(ms float64) float64 {
 }
 
 func (s *SpeedSkill) speedInitialStrain(time float64, current *preprocessing.DifficultyObject) float64 {
-	return (s.currentStrain * s.currentRhythm) * s.strainDecay(time-current.Previous(0).StartTime)
+	return (s.CurrentStrain * s.CurrentRhythm) * s.strainDecay(time-current.Previous(0).StartTime)
 }
 
 func (s *SpeedSkill) speedStrainValue(current *preprocessing.DifficultyObject) float64 {
-	s.currentStrain *= s.strainDecay(current.StrainTime)
-	s.currentStrain += evaluators.EvaluateSpeed(current) * speedSkillMultiplier
+	s.CurrentStrain *= s.strainDecay(current.StrainTime)
+	s.CurrentStrain += evaluators.EvaluateSpeed(current) * speedSkillMultiplier
 
-	s.currentRhythm = evaluators.EvaluateRhythm(current)
+	if math.IsNaN(current.RhythmDifficulty) {
+		current.RhythmDifficulty = evaluators.EvaluateRhythm(current)
+	}
+	s.CurrentRhythm = current.RhythmDifficulty
 
-	totalStrain := s.currentStrain * s.currentRhythm
+	totalStrain := s.CurrentStrain * s.CurrentStrain
 
 	s.objectStrains = append(s.objectStrains, totalStrain)
 

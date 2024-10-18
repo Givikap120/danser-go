@@ -323,7 +323,7 @@ func calculateOverlapness(odho1, odho2 *DifficultyObject) float64 {
 func retrieveCurrentVisibleObjects(current *DifficultyObject) []*DifficultyObject {
 	visibleObjects := []*DifficultyObject{}
 
-	for i := 0; i < current.Index; i++ {
+	for i := 0; i < current.Index+1; i++ {
 		hitObject := current.Previous(i)
 
 		if hitObject == nil || hitObject.StartTime < current.StartTime-current.Preempt {

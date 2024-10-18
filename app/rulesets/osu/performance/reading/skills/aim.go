@@ -16,7 +16,7 @@ const (
 type AimSkill struct {
 	*Skill
 	withSliders   bool
-	currentStrain float64
+	CurrentStrain float64
 }
 
 func NewAimSkill(d *difficulty.Difficulty, withSliders, stepCalc bool) *AimSkill {
@@ -33,14 +33,14 @@ func (skill *AimSkill) strainDecay(ms float64) float64 {
 }
 
 func (skill *AimSkill) aimInitialStrain(time float64, current *preprocessing.DifficultyObject) float64 {
-	return skill.currentStrain * skill.strainDecay(time-current.Previous(0).StartTime)
+	return skill.CurrentStrain * skill.strainDecay(time-current.Previous(0).StartTime)
 }
 
 func (skill *AimSkill) aimStrainValue(current *preprocessing.DifficultyObject) float64 {
-	skill.currentStrain *= skill.strainDecay(current.DeltaTime)
-	skill.currentStrain += evaluators.EvaluateAim(current, skill.withSliders) * aimSkillMultiplier
+	skill.CurrentStrain *= skill.strainDecay(current.DeltaTime)
+	skill.CurrentStrain += evaluators.EvaluateAim(current, skill.withSliders) * aimSkillMultiplier
 
-	skill.objectStrains = append(skill.objectStrains, skill.currentStrain)
+	skill.objectStrains = append(skill.objectStrains, skill.CurrentStrain)
 
-	return skill.currentStrain
+	return skill.CurrentStrain
 }

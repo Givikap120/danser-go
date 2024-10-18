@@ -14,8 +14,8 @@ import (
 
 const (
 	// StarScalingFactor is a global stars multiplier
-	StarScalingFactor float64 = 0.0675
-	CurrentVersion    int     = 20241007
+	StarScalingFactor float64 = 0.0668
+	CurrentVersion    int     = 20241018
 )
 
 type DifficultyCalculator struct{}

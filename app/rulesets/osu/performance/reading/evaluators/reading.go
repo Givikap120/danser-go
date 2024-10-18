@@ -11,6 +11,7 @@ import (
 const (
 	reading_window_size float64 = 3000
 	overlap_multiplier  float64 = 1
+	MECHANICAL_PP_POWER         = 0.6
 )
 
 func EvaluateReadingLowARDifficultyOf(current *preprocessing.DifficultyObject) float64 {
@@ -82,7 +83,7 @@ func GetHighARScaling(preempt float64) float64 {
 		value = math.Exp(9.07583 - 80.0*preempt/3)
 	}
 
-	return math.Pow(value, 1.0/ReadingHighAR.MECHANICAL_PP_POWER)
+	return math.Pow(value, 1.0/MECHANICAL_PP_POWER)
 }
 
 func EvaluateDensityOf(currObj *preprocessing.DifficultyObject, applyDistanceNerf bool, applySliderbodyDensity bool, angleNerfMultiplier float64) float64 {
