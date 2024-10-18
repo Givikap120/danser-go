@@ -26,11 +26,11 @@ type ReadingHighAR struct {
 }
 
 // NewReadingHighAR creates a new instance of ReadingHighAR
-func NewReadingHighAR(d *difficulty.Difficulty) *ReadingHighAR {
+func NewReadingHighAR(d *difficulty.Difficulty, stepCalc bool) *ReadingHighAR {
 	return &ReadingHighAR{
 		Skill:          NewSkill(d, false),
-		aimComponent:   NewHighARAimComponent(d),
-		speedComponent: NewHighARSpeedComponent(d),
+		aimComponent:   NewHighARAimComponent(d, stepCalc),
+		speedComponent: NewHighARSpeedComponent(d, stepCalc),
 	}
 }
 
@@ -45,22 +45,22 @@ func (skill *ReadingHighAR) Process(current *preprocessing.DifficultyObject) {
 	}
 
 	mergedDifficulty := math.Pow(
-		math.Pow(skill.aimComponent.CurrentSectionPeak, sumPower)+
-			math.Pow(skill.speedComponent.CurrentSectionPeak, sumPower), 1.0/sumPower)
+		math.Pow(skill.aimComponent.currentSectionPeak, sumPower)+
+			math.Pow(skill.speedComponent.currentSectionPeak, sumPower), 1.0/sumPower)
 
 	mergedDifficulty = readingHighARSkillMultiplier * math.Pow(mergedDifficulty, evaluators.MECHANICAL_PP_POWER)
 
 	if current.Index == 0 {
-		skill.CurrentSectionEnd = math.Ceil(current.StartTime/skill.SectionLength) * skill.SectionLength
+		skill.currentSectionEnd = math.Ceil(current.StartTime/skill.SectionLength) * skill.SectionLength
 	}
 
-	for current.StartTime > skill.CurrentSectionEnd {
-		skill.strainPeaks = append(skill.strainPeaks, skill.CurrentSectionPeak)
-		skill.CurrentSectionPeak = 0
-		skill.CurrentSectionEnd += skill.SectionLength
+	for current.StartTime > skill.currentSectionEnd {
+		skill.strainPeaks = append(skill.strainPeaks, skill.currentSectionPeak)
+		skill.currentSectionPeak = 0
+		skill.currentSectionEnd += skill.SectionLength
 	}
 
-	skill.CurrentSectionPeak = math.Max(mergedDifficulty, skill.CurrentSectionPeak)
+	skill.currentSectionPeak = math.Max(mergedDifficulty, skill.currentSectionPeak)
 }
 
 // DifficultyValue calculates the difficulty value for ReadingHighAR
@@ -92,9 +92,9 @@ func (skill *ReadingHighAR) DifficultyValue() float64 {
 	adjustedDifficulty := performanceToDifficulty(totalPerformance)
 	difficultyValue := math.Pow(adjustedDifficulty/difficultyMultiplier, 2.0)
 
-	skill.Difficulty = readingHighARSkillMultiplier * math.Pow(difficultyValue, evaluators.MECHANICAL_PP_POWER)
+	skill.difficulty = readingHighARSkillMultiplier * math.Pow(difficultyValue, evaluators.MECHANICAL_PP_POWER)
 
-	return skill.Difficulty
+	return skill.difficulty
 }
 
 // DifficultyToPerformance converts the difficulty value to performance points
@@ -111,8 +111,8 @@ type HighARAimComponent struct {
 	*AimSkill
 }
 
-func NewHighARAimComponent(d *difficulty.Difficulty) *HighARAimComponent {
-	skill := &HighARAimComponent{Aim: NewAimSkill(d, true, false)}
+func NewHighARAimComponent(d *difficulty.Difficulty, stepCalc bool) *HighARAimComponent {
+	skill := &HighARAimComponent{AimSkill: NewAimSkill(d, true, stepCalc)}
 	skill.StrainValueOf = skill.aimStrainValue
 	return skill
 }
@@ -120,7 +120,7 @@ func NewHighARAimComponent(d *difficulty.Difficulty) *HighARAimComponent {
 // Process processes the current DifficultyObject for aim
 func (component *HighARAimComponent) aimStrainValue(current *preprocessing.DifficultyObject) float64 {
 	component.CurrentStrain *= component.strainDecay(current.DeltaTime)
-	aimDifficulty := evaluators.EvaluateAim(current, true) * component.aimSkillMultiplier
+	aimDifficulty := evaluators.EvaluateAim(current, true) * aimSkillMultiplier
 	aimDifficulty *= evaluators.EvaluateHighARDifficultyOf(current, true)
 
 	component.CurrentStrain += aimDifficulty + componentDefaultValueMultiplier*evaluators.EvaluateHighARDifficultyOf(current, true)
@@ -133,8 +133,8 @@ type HighARSpeedComponent struct {
 	*SpeedSkill
 }
 
-func NewHighARSpeedComponent(d *difficulty.Difficulty) *HighARSpeedComponent {
-	skill := &HighARSpeedComponent{Speed: NewSpeedSkill(d, false)}
+func NewHighARSpeedComponent(d *difficulty.Difficulty, stepCalc bool) *HighARSpeedComponent {
+	skill := &HighARSpeedComponent{SpeedSkill: NewSpeedSkill(d, stepCalc)}
 	skill.StrainValueOf = skill.speedStrainValue
 	return skill
 }
@@ -142,7 +142,7 @@ func NewHighARSpeedComponent(d *difficulty.Difficulty) *HighARSpeedComponent {
 // Process processes the current DifficultyObject for speed
 func (component *HighARSpeedComponent) speedStrainValue(current *preprocessing.DifficultyObject) float64 {
 	component.CurrentStrain *= component.strainDecay(current.DeltaTime)
-	speedDifficulty := evaluators.EvaluateSpeed(current) * component.speedSkillMultiplier
+	speedDifficulty := evaluators.EvaluateSpeed(current) * speedSkillMultiplier
 	speedDifficulty *= evaluators.EvaluateHighARDifficultyOf(current, false)
 
 	component.CurrentStrain += speedDifficulty + componentDefaultValueMultiplier*evaluators.EvaluateHighARDifficultyOf(current, false)

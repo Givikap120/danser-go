@@ -2,6 +2,7 @@ package skills
 
 import (
 	"math"
+	"slices"
 
 	"github.com/wieku/danser-go/app/beatmap/difficulty"
 	"github.com/wieku/danser-go/app/rulesets/osu/performance/reading/evaluators"
@@ -23,7 +24,7 @@ type ReadingLowAR struct {
 }
 
 // NewReadingLowAR creates a new instance of ReadingLowAR
-func NewReadingLowAR(d *difficulty.Difficulty) *ReadingLowAR {
+func NewReadingLowAR(d *difficulty.Difficulty, stepCalc bool) *ReadingLowAR {
 	skill := &ReadingLowAR{Skill: NewSkill(d, false)}
 	skill.ReducedSectionCount = 5
 	skill.ReducedStrainBaseline = 0.7

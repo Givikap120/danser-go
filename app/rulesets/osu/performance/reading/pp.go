@@ -304,3 +304,21 @@ func (pp *PPv2) getComboScalingFactor() float64 {
 		return min(math.Pow(float64(pp.scoreMaxCombo), 0.8)/math.Pow(float64(pp.attribs.MaxCombo), 0.8), 1.0)
 	}
 }
+
+func AdjustCognitionPerformance(cognitionPerformance, mechanicalPerformance, flashlightPerformance float64) float64 {
+	// Assuming that less than 25 pp is not worthy for memory
+	capPerformance := mechanicalPerformance + flashlightPerformance + 25
+
+	ratio := cognitionPerformance / capPerformance
+	if ratio > 50 {
+		return capPerformance
+	}
+
+	ratio = softmin(ratio*10, 10, 5) / 10
+	return ratio * capPerformance
+}
+
+// softmin is a function that computes a soft minimum between two values with an optional power argument
+func softmin(a, b float64) float64 {
+	return a * b / math.Log(math.Exp(a)+math.Exp(b))
+}

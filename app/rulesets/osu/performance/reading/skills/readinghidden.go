@@ -18,8 +18,8 @@ type ReadingHidden struct {
 }
 
 // NewReadingHidden creates a new instance of ReadingHidden
-func NewReadingHidden(d *difficulty.Difficulty) *ReadingHidden {
-	skill := &ReadingHidden{AimSkill: NewAimSkill(d, false, false)}
+func NewReadingHidden(d *difficulty.Difficulty, stepCalc bool) *ReadingHidden {
+	skill := &ReadingHidden{AimSkill: NewAimSkill(d, false, stepCalc)}
 
 	skill.StrainValueOf = skill.readingHiddenStrainValue
 	return skill

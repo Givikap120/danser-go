@@ -1,12 +1,13 @@
 package skills
 
 import (
+	"math"
+	"slices"
+
 	"github.com/wieku/danser-go/app/beatmap/difficulty"
 	"github.com/wieku/danser-go/app/rulesets/osu/performance/reading/preprocessing"
 	"github.com/wieku/danser-go/framework/collections"
 	"github.com/wieku/danser-go/framework/math/mutils"
-	"math"
-	"slices"
 )
 
 type Skill struct {
@@ -32,8 +33,8 @@ type Skill struct {
 
 	peakWeights []float64
 
-	strainPeaks       []float64
-	strainPeaksSorted *collections.SortedList[float64]
+	strainPeaks []float64
+	//strainPeaksSorted *collections.SortedList[float64]
 
 	objectStrains        []float64
 	difficultStrainCount float64
