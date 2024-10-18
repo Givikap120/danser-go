@@ -13,6 +13,78 @@ const (
 	overlap_multiplier  float64 = 1
 )
 
+func EvaluateReadingLowARDifficultyOf(current *preprocessing.DifficultyObject) float64 {
+	// If the current object is a Spinner or it's the first object (index 0), return 0 difficulty
+	if current.IsSpinner || current.Index == 0 {
+		return 0
+	}
+
+	// Calculate base difficulty
+	density := math.Max(1, EvaluateDensityOf(current, true, true, 1.0))
+	difficulty := math.Pow(4*math.Log(density), 2.5)
+
+	// Calculate overlap bonus and add it to the difficulty
+	overlapBonus := EvaluateOverlapDifficultyOf(current) * difficulty
+	difficulty += overlapBonus
+
+	return difficulty
+}
+
+func EvaluateHiddenDifficultyOf(currObj *preprocessing.DifficultyObject) float64 {
+	density := EvaluateDensityOf(currObj, false, false, 1.0)
+	preempt := currObj.Preempt / 1000
+
+	densityFactor := math.Pow(density/6.2, 1.5)
+
+	var invisibilityFactor float64
+
+	// AR11+DT and faster = 0 HD pp unless density is big
+	if preempt < 0.2 {
+		invisibilityFactor = 0
+	} else {
+		// Else accelerating growth until around ART0, then linear,
+		// and starting from AR5 is 3 times faster again to buff AR0 +HD
+		invisibilityFactor = math.Min(math.Pow(preempt*2.4-0.2, 5), math.Max(preempt, preempt*3-2.4))
+	}
+
+	hdDifficulty := invisibilityFactor + densityFactor
+
+	// Scale by unpredictability slightly
+	hdDifficulty *= 0.96 + 0.1*EvaluateInpredictabilityOf(currObj) // Max multiplier is 1.1
+
+	return hdDifficulty
+}
+
+func EvaluateHighARDifficultyOf(currObj *preprocessing.DifficultyObject, applyAdjust bool) float64 {
+	result := GetHighARScaling(currObj.Preempt)
+
+	if applyAdjust {
+		inpredictability := EvaluateInpredictabilityOf(currObj)
+
+		// Apply nerf if object isn't new combo
+		inpredictability *= 1 + 0.1*(800-currObj.FollowLineTime)/800
+
+		result *= 0.98 + 0.6*inpredictability
+	}
+
+	return result
+}
+
+func GetHighARScaling(preempt float64) float64 {
+	// Get preempt in seconds
+	preempt /= 1000
+	var value float64
+
+	if preempt < 0.375 {
+		// We have a stop in the point of AR10.5, the value here = 0.396875, derivative = -10.5833,
+		value = 0.63 * math.Pow(8-20*preempt, 2.0/3) // This function is matching live high AR bonus
+	} else {
+		value = math.Exp(9.07583 - 80.0*preempt/3)
+	}
+
+	return math.Pow(value, 1.0/ReadingHighAR.MECHANICAL_PP_POWER)
+}
+
 func EvaluateDensityOf(currObj *preprocessing.DifficultyObject, applyDistanceNerf bool, applySliderbodyDensity bool, angleNerfMultiplier float64) float64 {
 	density := 0.0
 	densityAnglesNerf := -2.0
@@ -149,23 +221,6 @@ func EvaluateOverlapDifficultyOf(currObj *preprocessing.DifficultyObject) float6
 	}
 
 	return overlap_multiplier * math.Max(0, screenOverlapDifficulty)
-}
-
-func EvaluateDifficultyOf(current *preprocessing.DifficultyObject) float64 {
-	// If the current object is a Spinner or it's the first object (index 0), return 0 difficulty
-	if current.IsSpinner || current.Index == 0 {
-		return 0
-	}
-
-	// Calculate base difficulty
-	density := math.Max(1, EvaluateDensityOf(current, true, true, 1.0))
-	difficulty := math.Pow(4*math.Log(density), 2.5)
-
-	// Calculate overlap bonus and add it to the difficulty
-	overlapBonus := EvaluateOverlapDifficultyOf(current) * difficulty
-	difficulty += overlapBonus
-
-	return difficulty
 }
 
 func EvaluateAimingDensityFactorOf(current *preprocessing.DifficultyObject) float64 {
