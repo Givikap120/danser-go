@@ -21,6 +21,13 @@ type Attributes struct {
 	// SliderFactor is a ratio of Aim calculated without sliders to Aim with them
 	SliderFactor float64
 
+	ReadingDifficultyLowAR  float64
+	ReadingDifficultyHighAR float64
+	HiddenDifficulty        float64
+
+	LowArDifficultStrainCount  float64
+	HiddenDifficultStrainCount float64
+
 	ObjectCount int
 	Circles     int
 	Sliders     int
@@ -39,10 +46,14 @@ type StrainPeaks struct {
 	// Flashlight peaks
 	Flashlight []float64
 
+	ReadingLowAR  []float64
+	ReadingHighAR []float64
+	ReadingHidden []float64
+
 	// Total contains aim, speed and flashlight peaks passed through star rating formula
 	Total []float64
 }
 
 type PPv2Results struct {
-	Aim, Speed, Acc, Flashlight, Total float64
+	Aim, Speed, Acc, Flashlight, Reading, Total float64
 }
