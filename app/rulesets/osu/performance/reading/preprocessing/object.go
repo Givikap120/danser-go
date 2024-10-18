@@ -17,11 +17,13 @@ const (
 )
 
 type ReadingObject struct {
+	HitObject   *DifficultyObject
+	Overlapness float64
 }
 
-type OverlapObject struct {
-	Index       int32
-	Overlapness float64
+type OverlapValue struct {
+	Index int32
+	Value float64
 }
 
 type DifficultyObject struct {
@@ -74,7 +76,7 @@ type DifficultyObject struct {
 
 	ReadingObjects []ReadingObject
 
-	OverlapObjects []OverlapObject
+	OverlapValues []OverlapValue
 }
 
 func NewDifficultyObject(hitObject, lastLastObject, lastObject objects.IHitObject, d *difficulty.Difficulty, listOfDiffs *[]*DifficultyObject, index int) *DifficultyObject {
@@ -254,9 +256,9 @@ func getEndCursorPosition(obj objects.IHitObject, d *difficulty.Difficulty) (pos
 	return
 }
 
-func (o *DifficultyObject) getAnglePredictability() (anglePredictability float64) {
-	anglePredictability = 0
-	return
+func (o *DifficultyObject) getAnglePredictability() float64 {
+	anglePredictability := 0.0
+	return anglePredictability
 }
 
 func (o *DifficultyObject) getReadingObjects() (readingObjects []ReadingObject) {

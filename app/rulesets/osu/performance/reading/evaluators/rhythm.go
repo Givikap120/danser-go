@@ -113,7 +113,7 @@ func EvaluateRhythm(current *preprocessing.DifficultyObject) float64 {
 					}
 
 					// repeated island (ex: triplet -> triplet)
-					power := logistic(float64(island.delta), 2.75, 0.24, 14)
+					power := logisticCustom(float64(island.delta), 2.75, 0.24, 14)
 					effectiveRatio *= min(3.0/float64(islandCount.count), math.Pow(1.0/float64(islandCount.count), power))
 
 					//islandCounts[countIndex] = (islandCount.Island, islandCount.Count);
@@ -214,6 +214,6 @@ func (island *Island) equals(other *Island) bool {
 	return math.Abs(float64(island.delta-other.delta)) < island.deltaDifferenceEpsilon && island.deltaCount == other.deltaCount
 }
 
-func logistic(x, maxValue, multiplier, offset float64) float64 {
+func logisticCustom(x, maxValue, multiplier, offset float64) float64 {
 	return maxValue / (1 + math.Pow(math.E, offset-(multiplier*x)))
 }
