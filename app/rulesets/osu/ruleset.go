@@ -159,6 +159,7 @@ func NewOsuRuleset(beatMap *beatmap.BeatMap, cursors []*graphics.Cursor, mods []
 		diff.SetARCustom(beatMap.Diff.GetAR())
 
 		diff.SetMods(mods[i] | (beatMap.Diff.Mods & difficulty.ScoreV2)) // if beatmap has ScoreV2 mod, force it for all players
+		//diff.SetMods(beatMap.Diff.Mods | (beatMap.Diff.Mods & difficulty.ScoreV2)) // if beatmap has ScoreV2 mod, force it for all players
 		diff.SetCustomSpeed(beatMap.Diff.CustomSpeed)
 
 		player := &difficultyPlayer{cursor: cursor, diff: diff}

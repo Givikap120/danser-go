@@ -215,6 +215,8 @@ func run() {
 			settings.REPLAY = *replay
 		}
 
+		//modsParsed = difficulty2.ParseMods(*mods)
+
 		if !modsParsed.Compatible() {
 			panic("Incompatible mods selected!")
 		}
@@ -480,6 +482,8 @@ func run() {
 		} else if modsParsed.Active(difficulty2.HalfTime) {
 			settings.SPEED *= 0.75
 		}
+
+		allowDA = true
 
 		if settings.PLAY || !settings.KNOCKOUT || allowDA {
 			if !math.IsNaN(*ar) {

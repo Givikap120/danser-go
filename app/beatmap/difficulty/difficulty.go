@@ -76,7 +76,9 @@ func (diff *Difficulty) calculate() {
 	hpDrain, cs, od, ar := diff.hp, diff.cs, diff.od, diff.ar
 
 	if diff.Mods&HardRock > 0 {
-		ar = min(ar*1.4, 10)
+		if ar > 0 {
+			ar = min(ar*1.4, 10)
+		}
 		cs = min(cs*1.3, 10)
 		od = min(od*1.4, 10)
 		hpDrain = min(hpDrain*1.4, 10)
