@@ -53,14 +53,21 @@ func (scheduler *GenericScheduler) Init(objs []objects.IHitObject, diff *difficu
 		current, pOk := scheduler.queue[i].(*objects.Circle)
 		next, cOk := scheduler.queue[i+1].(*objects.Circle)
 
-		if pOk && cOk && (!current.SliderPoint || current.SliderPointStart) && (!next.SliderPoint || next.SliderPointStart) {
-			dst := current.GetStackedEndPositionMod(diff.Mods).Dst(next.GetStackedStartPositionMod(diff.Mods))
+		if pOk && cOk && (!current.SliderPoint || current.SliderPointStart || (current.SliderPointEnd && diff.CheckModActive(difficulty.Lazer))) && (!next.SliderPoint || next.SliderPointStart || (next.SliderPointEnd && diff.CheckModActive(difficulty.Lazer))) {
+			dst := current.GetStackedEndPositionMod(diff).Dst(next.GetStackedStartPositionMod(diff))
 
 			if dst <= float32(diff.CircleRadius*1.995) && next.GetStartTime()-current.GetEndTime() <= 3 { // Sacrificing a bit of UR for better looks
 				sTime := (next.GetStartTime() + current.GetEndTime()) / 2
 
-				dC := objects.DummyCircle(current.GetStackedEndPositionMod(diff.Mods).Add(next.GetStackedStartPositionMod(diff.Mods)).Scl(0.5), sTime)
-				dC.DoubleClick = true
+				if current.SliderPointEnd && diff.CheckModActive(difficulty.Lazer) { // Prioritize slider end timing
+					sTime = current.GetEndTime()
+				}
+
+				dC := objects.DummyCircle(current.GetStackedEndPositionMod(diff).Add(next.GetStackedStartPositionMod(diff)).Scl(0.5), sTime)
+
+				if !diff.CheckModActive(difficulty.Lazer) || (!current.SliderPointEnd && !next.SliderPointEnd) { // Don't double-click if any of them is a slider end
+					dC.DoubleClick = true
+				}
 
 				scheduler.queue[i] = dC
 
@@ -81,7 +88,7 @@ func (scheduler *GenericScheduler) Init(objs []objects.IHitObject, diff *difficu
 			}
 
 			if c, cOk := o.(*objects.Circle); cOk && (!c.SliderPoint || c.SliderPointStart) {
-				scheduler.queue[j] = objects.DummyCircle(c.GetStackedStartPositionMod(diff.Mods), c.GetStartTime()+1)
+				scheduler.queue[j] = objects.DummyCircle(c.GetStackedStartPositionMod(diff), c.GetStartTime()+1)
 			}
 		}
 	}

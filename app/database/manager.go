@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/karrick/godirwalk"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/wieku/danser-go/app/beatmap"
-	"github.com/wieku/danser-go/app/rulesets/osu/performance/pp220930"
+	"github.com/wieku/danser-go/app/rulesets/osu/performance/pp241007"
 	"github.com/wieku/danser-go/app/settings"
 	"github.com/wieku/danser-go/app/utils"
 	"github.com/wieku/danser-go/framework/env"
+	"github.com/wieku/danser-go/framework/files"
 	"github.com/wieku/danser-go/framework/goroutines"
 	"github.com/wieku/danser-go/framework/math/mutils"
 	"github.com/wieku/danser-go/framework/util"
@@ -37,9 +37,16 @@ type mapLocation struct {
 	file string
 }
 
+type modMap struct {
+	location mapLocation
+	modTime  time.Time
+}
+
 var migrations []Migration
 
 var songsDir string
+
+var difficultyCalc = pp241007.NewDifficultyCalculator()
 
 func Init() error {
 	log.Println("DatabaseManager: Initializing database...")
@@ -178,30 +185,22 @@ func LoadBeatmaps(skipDatabaseCheck bool, importListener ImportListener) []*beat
 }
 
 func unpackMaps() (dirs []string) {
-	_ = godirwalk.Walk(songsDir, &godirwalk.Options{
-		Callback: func(osPathname string, de *godirwalk.Dirent) error {
-			if de.IsDir() && osPathname != songsDir {
-				return godirwalk.SkipThis
-			}
+	oszs, err := files.SearchFiles(songsDir, "*.osz", 0)
 
-			if strings.HasSuffix(de.Name(), ".osz") {
-				dirName := strings.TrimSuffix(de.Name(), ".osz")
+	if err == nil && len(oszs) > 0 {
+		for _, osz := range oszs {
+			dirName := strings.TrimSuffix(filepath.Base(osz), ".osz")
 
-				destination := filepath.Join(filepath.Dir(osPathname), dirName)
+			destination := filepath.Join(filepath.Dir(osz), dirName)
 
-				log.Println("DatabaseManager: Unpacking", osPathname, "->", destination)
+			log.Println("DatabaseManager: Unpacking", osz, "->", destination)
 
-				utils.Unzip(osPathname, destination)
-				os.Remove(osPathname)
+			utils.Unzip(osz, destination)
+			os.Remove(osz)
 
-				dirs = append(dirs, dirName)
-			}
-
-			return nil
-		},
-		Unsorted:            true,
-		FollowSymbolicLinks: true,
-	})
+			dirs = append(dirs, dirName)
+		}
+	}
 
 	return
 }
@@ -223,7 +222,7 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 
 	cachedFolders, mapsInDB := getLastModified()
 
-	candidates := make([]mapLocation, 0)
+	candidates := make([]modMap, 0)
 
 	log.Println(fmt.Sprintf("DatabaseManager: Scanning \"%s\" for .osu files...", songsDir))
 
@@ -233,31 +232,39 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 
 	trySendStatus(importListener, Discovery, 0, 0)
 
-	err := godirwalk.Walk(songsDir, &godirwalk.Options{
-		Callback: func(osPathname string, de *godirwalk.Dirent) error {
-			if de.IsDir() && osPathname != songsDir && filepath.Dir(osPathname) != songsDir {
-				return godirwalk.SkipThis
-			}
-
-			if skipDatabaseCheck && de.IsDir() {
-				dirName := filepath.Base(osPathname)
+	err := files.WalkDir(songsDir, func(path string, level int, de files.DirEntry) error {
+		if de.IsDir() {
+			if skipDatabaseCheck && level > 0 {
+				dirName := filepath.Base(path)
 
 				if _, ok := cachedFolders[dirName]; ok && (mustCheckDirs == nil || !slices.Contains(mustCheckDirs, dirName)) {
-					return godirwalk.SkipThis
+					return files.SkipDir
 				}
 			}
 
-			if strings.HasSuffix(de.Name(), ".osu") {
-				candidates = append(candidates, mapLocation{
-					dir:  filepath.Base(filepath.Dir(osPathname)),
-					file: de.Name(),
-				})
+			return nil
+		}
+
+		// Don't read .osu files in main directory
+		if level > 0 && strings.HasSuffix(de.Name(), ".osu") {
+			relDir, err1 := filepath.Rel(songsDir, filepath.Dir(path))
+			info, err2 := de.Info()
+			if err1 != nil || err2 != nil {
+				return nil
 			}
 
-			return nil
-		},
-		Unsorted:            true,
-		FollowSymbolicLinks: true,
+			candidates = append(candidates, modMap{
+				location: mapLocation{
+					dir:  filepath.ToSlash(relDir),
+					file: de.Name(),
+				},
+				modTime: info.ModTime(),
+			})
+
+			return files.SkipChildDirs
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -277,38 +284,22 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 	trySendStatus(importListener, Comparison, 0, 0)
 
 	for _, candidate := range candidates {
-		partialPath := filepath.Join(candidate.dir, candidate.file)
-		mapPath := filepath.Join(songsDir, partialPath)
-
-		stat, err := os.Stat(mapPath)
-		if err != nil {
-			log.Println("DatabaseManager: Failed to read file stats, skipping:", partialPath)
-			log.Println("DatabaseManager: Error:", err)
-
-			// If file does exist we assume it's a permission error, don't remove it from database in that case
-			if !os.IsNotExist(err) {
-				delete(mapsInDB, candidate)
-			}
-
-			continue
-		}
-
-		if lastModified, ok := mapsInDB[candidate]; ok {
-			if lastModified == stat.ModTime().UnixNano()/1000000 {
+		if lastModified, ok := mapsInDB[candidate.location]; ok {
+			if lastModified == candidate.modTime.UnixNano()/1000000 {
 				// Map is up-to-date, so remove it from mapsInDB because values left in that map are later removed from database.
-				delete(mapsInDB, candidate)
+				delete(mapsInDB, candidate.location)
 
 				continue
 			}
 
 			if settings.General.VerboseImportLogs {
-				log.Println("DatabaseManager: New beatmap version found:", candidate.file)
+				log.Println("DatabaseManager: New beatmap version found:", candidate.location.file)
 			}
 		} else if settings.General.VerboseImportLogs {
-			log.Println("DatabaseManager: New beatmap found:", candidate.file)
+			log.Println("DatabaseManager: New beatmap found:", candidate.location.file)
 		}
 
-		mapsToImport = append(mapsToImport, candidate)
+		mapsToImport = append(mapsToImport, candidate.location)
 	}
 
 	log.Println("DatabaseManager: Compare complete.")
@@ -340,7 +331,7 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 	receive := make(chan *beatmap.BeatMap, workers)
 
 	goroutines.Run(func() {
-		util.BalanceChan(workers, mapsToImport, receive, func(candidate mapLocation) *beatmap.BeatMap {
+		util.BalanceChan(workers, mapsToImport, receive, func(candidate mapLocation) (*beatmap.BeatMap, bool) {
 			defer func() {
 				if err := recover(); err != nil { //TODO: Technically should be fixed but unexpected parsing problem won't crash whole process
 					log.Println("DatabaseManager: Failed to load \"", candidate.dir+"/"+candidate.file, "\":", err)
@@ -353,7 +344,7 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 			file, err := os.Open(mapPath)
 			if err != nil {
 				log.Println(fmt.Sprintf("\"DatabaseManager: Failed to read \"%s\", skipping. Error: %s", partialPath, err))
-				return nil
+				return nil, false
 			}
 
 			defer file.Close()
@@ -376,12 +367,12 @@ func importMaps(skipDatabaseCheck bool, mustCheckDirs []string, importListener I
 					log.Println("DatabaseManager: Imported:", partialPath)
 				}
 
-				return bMap
+				return bMap, true
 			} else {
 				log.Println("DatabaseManager: Failed to import:", partialPath)
 			}
 
-			return nil
+			return nil, false
 		})
 
 		close(receive)
@@ -428,7 +419,7 @@ func UpdateStarRating(maps []*beatmap.BeatMap, progressListener func(processed, 
 	var toCalculate []*beatmap.BeatMap
 
 	for _, b := range maps {
-		if b.Mode == 0 && (b.Stars < 0 || b.StarsVersion < pp220930.CurrentVersion) {
+		if b.Mode == 0 && (b.Stars < 0 || b.StarsVersion < difficultyCalc.GetVersion()) {
 			toCalculate = append(toCalculate, b)
 		}
 	}
@@ -444,11 +435,12 @@ func UpdateStarRating(maps []*beatmap.BeatMap, progressListener func(processed, 
 	receive := make(chan *beatmap.BeatMap, workers)
 
 	goroutines.Run(func() {
-		util.BalanceChan(workers, toCalculate, receive, func(bMap *beatmap.BeatMap) (ret *beatmap.BeatMap) {
+		util.BalanceChan(workers, toCalculate, receive, func(bMap *beatmap.BeatMap) (ret *beatmap.BeatMap, ret2 bool) {
 			ret = bMap // HACK: still return the beatmap even if execution panics: https://golangbyexample.com/return-value-function-panic-recover-go/
+			ret2 = true
 
 			defer func() {
-				bMap.StarsVersion = pp220930.CurrentVersion
+				bMap.StarsVersion = difficultyCalc.GetVersion()
 				bMap.Clear() //Clear objects and timing to avoid OOM
 
 				if err := recover(); err != nil { //TODO: Technically should be fixed but unexpected parsing problem won't crash whole process
@@ -464,11 +456,11 @@ func UpdateStarRating(maps []*beatmap.BeatMap, progressListener func(processed, 
 				log.Println("DatabaseManager:", bMap.Dir+"/"+bMap.File, "doesn't have enough hitobjects")
 				bMap.Stars = 0
 			} else {
-				attr := pp220930.CalculateSingle(bMap.HitObjects, bMap.Diff)
+				attr := difficultyCalc.CalculateSingle(bMap.HitObjects, bMap.Diff)
 				bMap.Stars = attr.Total
 			}
 
-			return bMap
+			return
 		})
 
 		close(receive)
