@@ -2,12 +2,12 @@ package play
 
 import (
 	"fmt"
-	"github.com/faiface/mainthread"
 	"github.com/wieku/danser-go/app/graphics"
 	"github.com/wieku/danser-go/app/rulesets/osu"
 	"github.com/wieku/danser-go/app/settings"
 	"github.com/wieku/danser-go/app/skin"
 	"github.com/wieku/danser-go/framework/assets"
+	"github.com/wieku/danser-go/framework/goroutines"
 	"github.com/wieku/danser-go/framework/graphics/batch"
 	"github.com/wieku/danser-go/framework/graphics/font"
 	"github.com/wieku/danser-go/framework/graphics/shape"
@@ -83,7 +83,7 @@ func NewRankingPanel(cursor *graphics.Cursor, ruleset *osu.OsuRuleSet, hitError 
 		}
 
 		if image != nil {
-			mainthread.CallNonBlock(func() {
+			goroutines.CallNonBlockMain(func() {
 				region := texture.LoadTextureSingle(image.RGBA(), 0).GetRegion()
 				bg.Texture = &region
 
@@ -184,7 +184,7 @@ func NewRankingPanel(cursor *graphics.Cursor, ruleset *osu.OsuRuleSet, hitError 
 
 	panel.score = fmt.Sprintf("%08d", score.Score)
 	panel.maxCombo = fmt.Sprintf("%dx", score.Combo)
-	panel.accuracy = fmt.Sprintf("%.2f%%", score.Accuracy)
+	panel.accuracy = fmt.Sprintf("%.2f%%", score.Accuracy*100)
 
 	panel.hpGraph = make([]vector.Vector2d, len(hpGraph))
 	copy(panel.hpGraph, hpGraph)
@@ -205,7 +205,10 @@ func NewRankingPanel(cursor *graphics.Cursor, ruleset *osu.OsuRuleSet, hitError 
 		panel.perfect = sprite.NewSpriteSingle(skin.GetTexture("ranking-perfect"), 0, pPos, vector.Centre)
 	}
 
-	stats := "Accuracy:\n"
+	stats := fmt.Sprintf("Slider ticks: %d/%d", int64(score.MaxTicks)-int64(score.CountSB), score.MaxTicks)
+	stats += fmt.Sprintf("\nSlider ends: %d/%d", score.SliderEnd, score.MaxSliderEnd)
+
+	stats += "\nAccuracy:\n"
 	stats += fmt.Sprintf("Error: %.2fms - %.2fms avg", hitError.GetAvgNeg(), hitError.GetAvgPos())
 
 	if panel.ruleset.GetBeatMap().Diff.Speed != 1.0 {
@@ -225,25 +228,15 @@ func NewRankingPanel(cursor *graphics.Cursor, ruleset *osu.OsuRuleSet, hitError 
 }
 
 func (panel *RankingPanel) loadMods() {
-	mods := panel.ruleset.GetBeatMap().Diff.GetModStringFull()
+	mods := panel.ruleset.GetBeatMap().Diff.Mods.StringFull()
 
 	offset := -64.0
 	for i, s := range mods {
-		if strings.HasPrefix(s, "DA:") {
-			bgTex := skin.GetTexture("selection-mod-base")
+		modSpriteName := "selection-mod-" + strings.ToLower(s)
 
-			modBg := sprite.NewSpriteSingle(bgTex, 6+float64(i), vector.NewVec2d(panel.ScaledWidth+offset, 416), vector.Centre)
-			panel.manager.Add(modBg)
+		mod := sprite.NewSpriteSingle(skin.GetTexture(modSpriteName), 6+float64(i), vector.NewVec2d(panel.ScaledWidth+offset, 416), vector.Centre)
 
-			mod := sprite.NewTextSpriteSize(strings.TrimPrefix(s, "DA:"), font.GetFont("Quicksand Bold"), float64(bgTex.Height)/4, 6+float64(i)+0.5, vector.NewVec2d(panel.ScaledWidth+offset, 416), vector.Centre)
-			panel.manager.Add(mod)
-		} else {
-			modSpriteName := "selection-mod-" + strings.ToLower(s)
-
-			mod := sprite.NewSpriteSingle(skin.GetTexture(modSpriteName), 6+float64(i), vector.NewVec2d(panel.ScaledWidth+offset, 416), vector.Centre)
-
-			panel.manager.Add(mod)
-		}
+		panel.manager.Add(mod)
 
 		offset -= 32
 	}
@@ -279,13 +272,20 @@ func (panel *RankingPanel) Draw(batch *batch.QuadBatch, alpha float64) {
 	fnt.DrawOrigin(batch, text1-65/0.625, row4+10/0.625, vector.TopLeft, fnt.GetSize()*1.12, false, panel.maxCombo)
 	fnt.DrawOrigin(batch, text2-86/0.625, row4+10/0.625, vector.TopLeft, fnt.GetSize()*1.12, false, panel.accuracy)
 
-	fnt2 := font.GetFont("Ubuntu Regular")
+	ubuFont := font.GetFont("Ubuntu Regular")
+	fnt2 := font.GetFont("SBFont")
 
-	fnt2.Overlap = 0.7
+	fnt2.Overlap = 0
+
+	if fnt2 == ubuFont {
+		fnt2.Overlap = 0.7
+	}
 
 	fnt2.Draw(batch, 5, 30-3, 30, panel.beatmapName)
 
-	fnt2.Overlap = 1
+	if fnt2 == ubuFont {
+		fnt2.Overlap = 1
+	}
 
 	fnt2.Draw(batch, 5, 30+22, 22, panel.beatmapCreator)
 

@@ -240,7 +240,9 @@ func ParseBeatMap(beatMap *BeatMap) error {
 
 func ParseBeatMapFile(file *os.File) *BeatMap {
 	beatMap := NewBeatMap()
-	beatMap.Dir = filepath.Base(filepath.Dir(file.Name()))
+	beatMap.Dir, _ = filepath.Rel(settings.General.GetSongsDir(), filepath.Dir(file.Name()))
+	beatMap.Dir = filepath.ToSlash(beatMap.Dir)
+
 	f, _ := file.Stat()
 	beatMap.File = f.Name()
 
@@ -357,7 +359,7 @@ func ParseObjects(beatMap *BeatMap, diffCalcOnly, parseColors bool) {
 	comboSetHax := 0
 	forceNewCombo := false
 
-	for _, iO := range beatMap.HitObjects {
+	for i, iO := range beatMap.HitObjects {
 		if iO.GetType() == objects.SPINNER {
 			forceNewCombo = true
 		} else if iO.IsNewCombo() || forceNewCombo {
@@ -369,10 +371,15 @@ func ParseObjects(beatMap *BeatMap, diffCalcOnly, parseColors bool) {
 			forceNewCombo = false
 		}
 
+		if iO.IsNewCombo() && i > 0 {
+			beatMap.HitObjects[i-1].SetLastInCombo(true)
+		}
+
 		iO.SetID(int64(num))
 		iO.SetComboNumber(int64(comboNumber))
 		iO.SetComboSet(int64(comboSet))
 		iO.SetComboSetHax(int64(comboSetHax))
+		iO.SetStackLeniency(beatMap.StackLeniency)
 
 		comboNumber++
 		num++
@@ -382,5 +389,7 @@ func ParseObjects(beatMap *BeatMap, diffCalcOnly, parseColors bool) {
 		obj.SetTiming(beatMap.Timings, beatMap.Version, diffCalcOnly)
 	}
 
-	calculateStackLeniency(beatMap, diffCalcOnly)
+	if settings.Objects.StackEnabled || settings.KNOCKOUT || settings.PLAY || diffCalcOnly {
+		beatMap.CalculateStackLeniency(beatMap.Diff)
+	}
 }

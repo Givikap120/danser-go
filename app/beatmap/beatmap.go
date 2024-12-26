@@ -5,7 +5,10 @@ import (
 	"github.com/wieku/danser-go/app/audio"
 	"github.com/wieku/danser-go/app/beatmap/difficulty"
 	"github.com/wieku/danser-go/app/beatmap/objects"
+	"github.com/wieku/danser-go/app/settings"
+	"github.com/wieku/danser-go/framework/files"
 	"math"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -61,18 +64,23 @@ type BeatMap struct {
 	ARSpecified bool
 
 	LocalOffset int
+
+	pathCache *files.FileMap
+
+	stackCalcCache map[int64]bool
 }
 
 func NewBeatMap() *BeatMap {
 	beatMap := &BeatMap{
-		Timings:       objects.NewTimings(),
-		StackLeniency: 0.7,
-		Diff:          difficulty.NewDifficulty(5, 5, 5, 5),
-		Stars:         -1,
-		MinBPM:        math.Inf(0),
-		MaxBPM:        0,
+		Timings:        objects.NewTimings(),
+		StackLeniency:  0.7,
+		Diff:           difficulty.NewDifficulty(5, 5, 5, 5),
+		Stars:          -1,
+		MinBPM:         math.Inf(0),
+		MaxBPM:         0,
+		stackCalcCache: make(map[int64]bool),
 	}
-	//beatMap.Diff.SetMods(difficulty.HardRock|difficulty.Hidden)
+
 	return beatMap
 }
 
@@ -199,10 +207,35 @@ func (beatMap *BeatMap) FinalizePoints() {
 }
 
 func (beatMap *BeatMap) LoadCustomSamples() {
-	audio.LoadBeatmapSamples(beatMap.Dir)
+	audio.LoadBeatmapSamples(beatMap.getPathCache().GetMap())
 }
 
 func (beatMap *BeatMap) UpdatePlayStats() {
 	beatMap.PlayCount += 1
 	beatMap.LastPlayed = time.Now().UnixNano() / 1000000
+}
+
+func (beatMap *BeatMap) getPathCache() *files.FileMap {
+	if beatMap.pathCache == nil {
+		beatMap.pathCache, _ = files.NewFileMap(filepath.Join(settings.General.GetSongsDir(), beatMap.Dir))
+	}
+
+	return beatMap.pathCache
+}
+
+func (beatMap *BeatMap) GetRelatedFile(path string) (string, error) {
+	return beatMap.getPathCache().GetFile(path)
+}
+
+func (beatMap *BeatMap) GetAudioFile() (string, error) {
+	return beatMap.GetRelatedFile(beatMap.Audio)
+}
+
+func (beatMap *BeatMap) CalculateStackLeniency(diff *difficulty.Difficulty) {
+	stackThreshold := int64(math.Floor(diff.Preempt * beatMap.StackLeniency))
+
+	if !beatMap.stackCalcCache[stackThreshold] {
+		processStacking(beatMap.HitObjects, beatMap.Version, diff, beatMap.StackLeniency)
+		beatMap.stackCalcCache[stackThreshold] = true
+	}
 }
