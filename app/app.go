@@ -396,14 +396,13 @@ func run() {
 			os.Exit(0)
 		}
 
-		allowDA := false
+		allowDA := true
 
 		// if map was launched not in knockout or play mode but AT mod is present, use replay mode for danser, allowing custom ar,od,cs,hp
 		if !settings.KNOCKOUT && modsParsed.Active(difficulty2.Autoplay) {
 			settings.PLAY = false
 			settings.KNOCKOUT = true
 			settings.Knockout.MaxPlayers = 0
-			allowDA = true
 		}
 
 		lastSamples = int(settings.Graphics.MSAA)
